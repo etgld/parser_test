@@ -1,0 +1,8 @@
+package org.apache.ctakes.rt_parser.ae
+// Commands and parameters to create a default token processing pipeline
+add SimpleSegmentAnnotator
+add ParagraphAnnotator
+add ParagraphSentencer
+add TokenizerAnnotatorPTB
+add SemanticTableFileWriter
+add pretty.plaintext.PrettyTextWriterFit

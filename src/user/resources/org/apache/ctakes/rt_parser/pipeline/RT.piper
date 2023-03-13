@@ -4,5 +4,3 @@ add SimpleSegmentAnnotator
 add ParagraphAnnotator
 add ParagraphSentencer
 add TokenizerAnnotatorPTB
-add SemanticTableFileWriter
-add pretty.plaintext.PrettyTextWriterFit

@@ -73,6 +73,26 @@ def get_casoid_entities(casoid):
     return axis_spans, sig_spans
 
 
+def get_tagged_sentence(procedure_map, sentence):
+    tagged_sent_pieces = []
+    previous = 0
+    for inds, tag in sorted(procedure_map.items()):
+        begin, end = inds
+        tagged_sent_pieces.append(sentence[previous:begin])
+        tagged_sent_pieces.append(f" <{tag}> ")
+        tagged_sent_pieces.append(sentence[begin:end])
+        tagged_sent_pieces.append(f" </{tag}> ")
+        previous = end
+    return "".join(tagged_sent_pieces)
+
+
+def debug_printing(sent_to_procedures, sentences):
+    with open("python_debug_out.txt", "wt") as debug_out:
+        for idx, bundle in enumerate(zip(sentences, sent_to_procedures)):
+            sentence, procedure_map = bundle
+            debug_out.write(f"{idx}.\t{get_tagged_sentence(procedure_map, sentence)}\n\n")
+
+
 class RTAnnotator(CasAnnotator):
     def __init__(self):
         self.taggers = None
@@ -92,10 +112,8 @@ class RTAnnotator(CasAnnotator):
         self.taggers = taggers_dict
         self.out_models = out_model_dict
         self.anchor_task = "rt_dose"
-        print("INITIALIZATION FINISHED", file=sys.stdout)
 
     def process(self, cas):
-        print("NON-CAS REINSERTION PROCESSING STARTING", file=sys.stdout)
         dose_type = cas.typesystem.get_type(DoseModifier)
         fxno_type = cas.typesystem.get_type(DosageCountModifier)
         total_dose_type = cas.typesystem.get_type(TotalDosageModifier)
@@ -145,7 +163,7 @@ class RTAnnotator(CasAnnotator):
         paragraph_dose_sets = [{(idx_1, idx_2) for idx_1, idx_2, dose_label in paragraph_axes}
                                for paragraph_axes in axis_spans]
 
-        print("NON-CAS REINSERTION PROCESSING FINISHED", file=sys.stdout)
+        sent_to_procedures = []
 
         total_paragraphs = len(sent_maps)
         current = 1
@@ -170,38 +188,55 @@ class RTAnnotator(CasAnnotator):
                 else:
                     AttributeError(f"Neither {first_span} nor {second_span} in:\n\n {paragraph_dose_set}")
 
-            for dose_indices, mention_attributes in mention_materials.items():
+            for dose_indices, mention_attributes in sorted(mention_materials.items()):
                 num_procedures = len(max(mention_attributes.values(), key=len))
                 dose_begin, dose_end = dose_indices
                 cas_dose_begin, _ = token_map[dose_begin]
                 _, cas_dose_end = token_map[dose_end]
                 procedures = [add_type(cas, procedure_type, cas_dose_begin, cas_dose_end) for _ in
                               range(num_procedures)]
+                debug_procedures = []
+                # avoiding a weird consequence of just doing
+                # debug_procedures = [{}] * num_procedures
+                # where if it was followed by debug_procedures[0]["dose"] = (0,1)
+                # we would get [{ "dose" : ( 0, 1 ) } ... { "dose" : ( 0, 1 ) }]
+                _ = [debug_procedures.append({}) for _ in range(num_procedures)]
                 # TODO - if we end up supporting Python >= 3.10 in the future turn this into a case statement
-                # 171 is problem line rn
                 for attr_type, inds_list in mention_attributes.items():
-                    for idx, inds in enumerate(inds_list):
+                    for idx, inds in enumerate(sorted(inds_list)):
+                        # redundant but jic
+                        central_dose = add_type(cas, dose_type, cas_dose_begin, cas_dose_end)
+                        procedures[idx].dose = central_dose
+                        debug_procedures[idx][(cas_dose_begin, cas_dose_end)] = "central-dose"
                         local_begin, local_end = inds
                         cas_sig_begin, _ = token_map[local_begin]
                         _, cas_sig_end = token_map[local_end]
                         if attr_type == "boost":
                             procedure_boost = add_type(cas, boost_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].statusChange = procedure_boost
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "boost"
                         elif attr_type == "dose":
-                            procedure_total_dose = add_type(cas, dose_type, cas_sig_begin, cas_sig_end)
+                            procedure_total_dose = add_type(cas, total_dose_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].totalDose = procedure_total_dose
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "secondary-dose"
                         elif attr_type == "fxno":
                             procedure_dosage_count = add_type(cas, fxno_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].dosageCount = procedure_dosage_count
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxno"
                         elif attr_type == "fxfreq":
                             procedure_frequency = add_type(cas, fxfreq_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].frequency = procedure_frequency
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxfreq"
                         elif attr_type == "site":
                             procedure_anatomical_site = add_type(cas, site_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].anatomicalSite = procedure_anatomical_site
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "site"
                         elif attr_type == "date":
                             procedure_start_time = add_type(cas, date_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].startTime = procedure_start_time
+                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "date"
+                        sent_to_procedures.append(debug_procedures)
             print(f"{current} OUT OF {total_paragraphs} PROCESSED", file=sys.stdout)
             current += 1
+        debug_printing(sent_to_procedures, paragraphs)
         print("FINISHED", file=sys.stdout)

@@ -36,8 +36,8 @@ set WriteBanner=yes
 //
 // pip the dependency packages in case your environment doesn't have them or needs an update.
 //
-// PbjPipper is PBJ specific, might need to adapt this if we want to turn pip-ing on and off as needed
-//add PbjPipper
+// Need to install PBJ from `resources` via PBJPipper prior to the installing `rt_parser` since it depends on PBJ
+add PbjPipper
 // pip the cnlp_transformers project and its dependencies.
 add PythonRunner Command="-m pip install resources/org/apache/ctakes/rt_parser/rt_parser_py" Wait=yes
 

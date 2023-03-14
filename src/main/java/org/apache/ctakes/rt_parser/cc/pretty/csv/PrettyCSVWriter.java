@@ -28,7 +28,7 @@ final public class PrettyCSVWriter {
 
    static private final Logger LOGGER = Logger.getLogger( "PrettyCSVWriter" );
    static private final String FILE_EXTENSION = ".csv";
-   static private int _current_procedure = 0;
+   // static private int _current_procedure = 0;
 
    private String _outputDirPath;
 
@@ -78,20 +78,25 @@ final public class PrettyCSVWriter {
    public void writeFile( final JCas jCas, final String outputFilePath ) {
       try ( final BufferedWriter writer = new BufferedWriter( new FileWriter( outputFilePath ) ) ) {
          // csv columns
-         writer.write("procedure_number,central_dose,boost,date,secondary_dose,fraction_frequency,fraction_number,site");
+         // writer.write("procedure_number,central_dose,boost,date,secondary_dose,fraction_frequency,fraction_number,site");
+         writer.write("central_dose,boost,date,secondary_dose,fraction_frequency,fraction_number,site");
          writer.newLine();
-         final List<ProcedureMention> procedureMentions = JCasUtil
-                 .select( jCas, ProcedureMention.class )
+         JCasUtil.select( jCas, ProcedureMention.class )
                  .stream()
                  .sorted(
                          Comparator.comparing(
                                  ProcedureMention :: getBegin
                          )
                  )
-                 .collect(Collectors.toList());
-         for ( ProcedureMention procedureMention : procedureMentions ) {
-            writeMention( procedureMention, writer );
-         }
+                 .forEach(p -> {
+                    try {
+                       writeMention(p, writer);
+                    } catch (IOException e) {
+                       // don't know why we didn't have to
+                       // deal with an exception possibility in the for loop but whatever
+                       throw new RuntimeException(e);
+                    }
+                 });
       } catch ( IOException ioE ) {
          LOGGER.error( "Could not not write csv file " + outputFilePath );
          LOGGER.error( ioE.getMessage() );
@@ -124,8 +129,8 @@ final public class PrettyCSVWriter {
       // to do this but for now:
       String youGotTheDud = "None,"; //or maybe -1_-1 if one runs into Pandas issues
 
-      writer.write(String.format("%d,", _current_procedure));
-      _current_procedure++;
+      // writer.write(String.format("%d,", _current_procedure));
+      // _current_procedure++;
 
       // central dose
       try {

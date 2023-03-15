@@ -6,13 +6,19 @@
 reader PbjReceiver ReceiveQueue=PyToJava
 
 // Save a nice table.
-add SemanticTableFileWriter SubDirectory=table
+// add SemanticTableFileWriter SubDirectory=table
 
 // Save HTML.
-add pretty.html.HtmlTextWriter SubDirectory=html
+// add pretty.html.HtmlTextWriter SubDirectory=html
 
 // Save marked text.
-add pretty.plaintext.PrettyTextWriterFit SubDirectory=text
+// add pretty.plaintext.PrettyTextWriterFit SubDirectory=text
+
+// Save CSV tables
+add pretty.csv.PrettyCSVWriter SubDirectory=csv
+
+// Save text rendering of procedure annotations
+add pretty.text.PrettyRTWriter SubDirectory=text
 
 // Perform steps to stop the pbj pipeline
 load RTStopper

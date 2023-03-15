@@ -37,7 +37,6 @@ load RTStarter
 
 add CtakesRunner Pipeline="-p RTThirdStep -o $OutputDirectory -a $ArtemisBroker"
 
-
 //
 // Start the python bit of the full pipeline.
 //

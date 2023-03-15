@@ -35,7 +35,7 @@ load RTStarter
 // $ArtemisBroker will substitute the value of this cTAKES pipeline's value for ArtemisBroker.
 //
 
-add CtakesRunner Pipeline="-p RTThirdStep -o $OutputDirectory -a $ArtemisBroker"
+add CtakesRunner Pipeline="-p org/apache/ctakes/rt_parser/pipeline/RTThirdStep -o $OutputDirectory -a $ArtemisBroker"
 
 //
 // Start the python bit of the full pipeline.
@@ -46,7 +46,7 @@ set RTSecondStep=rt_parser.rt_annotator_pipeline
 
 // There is a fixed order to queue specification in python pipelines.
 // The incoming (receiver) queue is named first, the outgoing (sender) queue is named second.
-add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory" LogFile=rt_annotator_pipeline.log
+add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory --port 61620" LogFile=rt_annotator_pipeline.log
 
 
 //
@@ -57,4 +57,4 @@ add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory
 load RT
 
 // Send CAS to Artemis at the specified queue.  Send stop signal when processing has finished.
-add PbjJmsSender SendQueue=JavaToPy SendStop=no
+add PbjJmsSender SendQueue=JavaToPy SendStop=no Port=61620

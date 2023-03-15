@@ -1,3 +1,4 @@
+package org.apache.ctakes.rt_parser
 #
 #  This is a piper file that will perform initial steps required for running a ctakes-pbj pipeline.
 #

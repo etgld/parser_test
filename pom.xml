@@ -21,14 +21,17 @@
             <artifactId>ctakes-pbj</artifactId>
             <version>${ctakes.version}</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/xalan/xalan -->
-
+        <!--
         <dependency>
             <groupId>xalan</groupId>
             <artifactId>xalan</artifactId>
             <version>2.7.2</version>
         </dependency>
-
+    	<dependency>
+	    	<groupId>xerces</groupId>
+		    <artifactId>xercesImpl</artifactId>
+		    <version>2.9.1</version>
+	    </dependency> -->
         <dependency>
             <groupId>org.apache.ctakes</groupId>
             <artifactId>ctakes-core</artifactId>

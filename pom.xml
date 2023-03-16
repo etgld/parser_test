@@ -8,27 +8,44 @@
 
     <artifactId>rt-parser</artifactId>
     <modelVersion>4.0.0</modelVersion>
+
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <ctakes.version>5.0.0-SNAPSHOT</ctakes.version>
     </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.ctakes</groupId>
             <artifactId>ctakes-pbj</artifactId>
             <version>${ctakes.version}</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/xalan/xalan -->
+
+        <dependency>
+            <groupId>xalan</groupId>
+            <artifactId>xalan</artifactId>
+            <version>2.7.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.ctakes</groupId>
+            <artifactId>ctakes-core</artifactId>
+            <version>${ctakes.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.ctakes</groupId>
             <artifactId>ctakes-user-resources</artifactId>
             <version>${ctakes.version}</version>
+
             <exclusions>
                 <exclusion>
                     <groupId>*</groupId>
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+
         </dependency>
     </dependencies>
     <repositories>
@@ -79,7 +96,7 @@
                 <executions>
                     <execution>
                         <id>unpack-ctakes-resources</id>
-                        <!--                     Default phase is process-sources -->
+                        <!--                  Default phase is process-sources -->
                         <goals>
                             <goal>unpack-dependencies</goal>
                         </goals>
@@ -91,6 +108,6 @@
                     </execution>
                 </executions>
             </plugin>
-        </plugins>
-    </build>
+      </plugins>
+  </build>
 </project>

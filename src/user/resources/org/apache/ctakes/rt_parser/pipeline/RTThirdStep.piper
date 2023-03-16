@@ -1,10 +1,11 @@
 package org.apache.ctakes.rt_parser
+package org.apache.core.cc.pretty.plaintext
 #
 #  This piper file just listens to a queue and saves cas information to output files.
 #
 
 // Get cas from Artemis.
-reader PbjReceiver ReceiveQueue=PyToJava Port=61620
+reader PbjReceiver ReceiveQueue=PyToJava
 
 // Save a nice table.
 // add SemanticTableFileWriter SubDirectory=table
@@ -16,10 +17,13 @@ reader PbjReceiver ReceiveQueue=PyToJava Port=61620
 // add pretty.plaintext.PrettyTextWriterFit SubDirectory=text
 
 // Save CSV tables
-add pretty.csv.PrettyCSVWriter SubDirectory=csv
+// add org.apache.ctakes.rt_parser.cc.pretty.csv.PrettyCSVWriter SubDirectory=csv
+add PrettyCSVWriter SubDirectory=csv
 
 // Save text rendering of procedure annotations
-add pretty.text.PrettyRTWriter SubDirectory=text
+// add org.apache.ctakes.rt_parser.cc.pretty.text.PrettyRTWriter SubDirectory=text
+add PrettyRTWriter SubDirectory=text
+
 
 // Perform steps to stop the pbj pipeline
-load RTStopper
+load PbjStopper

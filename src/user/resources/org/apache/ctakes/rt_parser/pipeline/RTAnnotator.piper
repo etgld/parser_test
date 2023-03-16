@@ -27,7 +27,8 @@ set SetJavaHome=no
 
 
 //  Sets up required parameters, starts your Artemis Broker, pips the PBJ project.
-load RTStarter
+load PbjStarter
+add PythonRunner Command="-m pip install resources/org/apache/ctakes/rt_parser/rt_parser_py" Wait=yes
 
 //
 // Start another instance of cTAKES, running the pipeline in StartAllExample_end.piper
@@ -46,7 +47,7 @@ set RTSecondStep=rt_parser.rt_annotator_pipeline
 
 // There is a fixed order to queue specification in python pipelines.
 // The incoming (receiver) queue is named first, the outgoing (sender) queue is named second.
-add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory --port 61620" LogFile=rt_annotator_pipeline.log
+add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory" LogFile=rt_annotator_pipeline.log
 
 
 //
@@ -57,4 +58,4 @@ add PythonRunner Command="-m $RTSecondStep JavaToPy PyToJava -o $OutputDirectory
 load RT
 
 // Send CAS to Artemis at the specified queue.  Send stop signal when processing has finished.
-add PbjJmsSender SendQueue=JavaToPy SendStop=no Port=61620
+add PbjJmsSender SendQueue=JavaToPy SendStop=no

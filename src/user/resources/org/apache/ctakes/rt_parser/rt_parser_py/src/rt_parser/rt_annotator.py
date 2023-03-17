@@ -76,6 +76,8 @@ def get_casoid_entities(casoid):
 def get_tagged_sentence(procedure_map, sentence):
     tagged_sent_pieces = []
     previous = 0
+    print(sentence, file=sys.stderr)
+    print(procedure_map, file=sys.stderr)
     for inds, tag in sorted(procedure_map.items()):
         begin, end = inds
         tagged_sent_pieces.append(sentence[previous:begin])
@@ -107,7 +109,8 @@ class RTAnnotator(CasAnnotator):
         # TODO - replace this with a logger message or something
         # TODO - point this to the write place
         taggers_dict, out_model_dict = model_dicts(
-            "/home/ch231037/rt_models/"
+            # "/home/ch231037/rt_models/"
+            "/home/etg/RT_Resources/trained_train+dev_tested_on_test/test_pipeline_models"
         )
         self.taggers = taggers_dict
         self.out_models = out_model_dict
@@ -236,7 +239,7 @@ class RTAnnotator(CasAnnotator):
                             procedures[idx].startTime = procedure_start_time
                             debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "date"
                         sent_to_procedures.append(debug_procedures)
-            print(f"{current} OUT OF {total_paragraphs} PROCESSED", file=sys.stdout)
+            print(f"{current} OUT OF {total_paragraphs} PROCESSED", file=sys.stderr)
             current += 1
         debug_printing(sent_to_procedures, paragraphs)
-        print("FINISHED", file=sys.stdout)
+        print("FINISHED", file=sys.stderr)

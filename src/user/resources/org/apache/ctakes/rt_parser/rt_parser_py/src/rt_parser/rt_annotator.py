@@ -74,25 +74,30 @@ def get_casoid_entities(casoid):
 
 
 def get_tagged_sentence(procedure_map, sentence):
-    tagged_sent_pieces = []
-    previous = 0
-    print(sentence, file=sys.stderr)
-    print(procedure_map, file=sys.stderr)
-    for inds, tag in sorted(procedure_map.items()):
-        begin, end = inds
-        tagged_sent_pieces.append(sentence[previous:begin])
-        tagged_sent_pieces.append(f" <{tag}> ")
-        tagged_sent_pieces.append(sentence[begin:end])
-        tagged_sent_pieces.append(f" </{tag}> ")
-        previous = end
-    return "".join(tagged_sent_pieces)
+    ann_sents = []
+    for sent_procs in procedure_map:
+        previous = 0
+        tagged_sent_pieces = []
+        for inds, tag in sorted(sent_procs.items()):
+            begin, end = inds
+            tagged_sent_pieces.append(sentence[previous:begin])
+            tagged_sent_pieces.append(f" <{tag}> ")
+            tagged_sent_pieces.append(sentence[begin:end])
+            tagged_sent_pieces.append(f" </{tag}> ")
+            previous = end
+        ann_sents.append("".join(tagged_sent_pieces))
+    return ann_sents
 
 
 def debug_printing(sent_to_procedures, sentences):
     with open("python_debug_out.txt", "wt") as debug_out:
         for idx, bundle in enumerate(zip(sentences, sent_to_procedures)):
             sentence, procedure_map = bundle
-            debug_out.write(f"{idx}.\t{get_tagged_sentence(procedure_map, sentence)}\n\n")
+            debug_out.write(f"{idx}")
+            for out_str in get_tagged_sentence(procedure_map, sentence):
+                debug_out.write(f"{out_str}\n\n")
+
+
 
 
 class RTAnnotator(CasAnnotator):
@@ -166,10 +171,10 @@ class RTAnnotator(CasAnnotator):
         paragraph_dose_sets = [{(idx_1, idx_2) for idx_1, idx_2, dose_label in paragraph_axes}
                                for paragraph_axes in axis_spans]
 
-        sent_to_procedures = []
-
         total_paragraphs = len(sent_maps)
         current = 1
+
+        sent_to_debug_procedures = []
 
         for relations, token_map, paragraph_dose_set in zip(casoid_labels, sent_maps, paragraph_dose_sets):
             mention_materials = defaultdict(lambda: defaultdict(lambda: []))
@@ -180,17 +185,18 @@ class RTAnnotator(CasAnnotator):
                     label_dict,
                 ) = relation
                 relation_label = label_dict["label"]
-                sig_label = relation_label.split("-")[-1].lower()
-                if relation_label == "DOSE-DOSE":
-                    mention_materials[first_span]["dose"].append(second_span)
-                    mention_materials[second_span]["dose"].append(first_span)
-                elif first_span in paragraph_dose_set:
-                    mention_materials[first_span][sig_label].append(second_span)
-                elif second_span in paragraph_dose_set:
-                    mention_materials[second_span][sig_label].append(first_span)
-                else:
-                    AttributeError(f"Neither {first_span} nor {second_span} in:\n\n {paragraph_dose_set}")
-
+                if relation_label != "None":
+                    sig_label = relation_label.split("-")[-1].lower()
+                    if relation_label == "DOSE-DOSE":
+                        mention_materials[first_span]["dose"].append(second_span)
+                        mention_materials[second_span]["dose"].append(first_span)
+                    elif first_span in paragraph_dose_set:
+                        mention_materials[first_span][sig_label].append(second_span)
+                    elif second_span in paragraph_dose_set:
+                        mention_materials[second_span][sig_label].append(first_span)
+                    else:
+                        AttributeError(f"Neither {first_span} nor {second_span} in:\n\n {paragraph_dose_set}")
+            sent_debug_procedures = []
             for dose_indices, mention_attributes in sorted(mention_materials.items()):
                 num_procedures = len(max(mention_attributes.values(), key=len))
                 dose_begin, dose_end = dose_indices
@@ -198,48 +204,50 @@ class RTAnnotator(CasAnnotator):
                 _, cas_dose_end = token_map[dose_end]
                 procedures = [add_type(cas, procedure_type, cas_dose_begin, cas_dose_end) for _ in
                               range(num_procedures)]
-                debug_procedures = []
+                local_debug_procedures = []
                 # avoiding a weird consequence of just doing
-                # debug_procedures = [{}] * num_procedures
-                # where if it was followed by debug_procedures[0]["dose"] = (0,1)
+                # local_debug_procedures = [{}] * num_procedures
+                # where if it was followed by local_debug_procedures[0]["dose"] = (0,1)
                 # we would get [{ "dose" : ( 0, 1 ) } ... { "dose" : ( 0, 1 ) }]
-                _ = [debug_procedures.append({}) for _ in range(num_procedures)]
+                _ = [local_debug_procedures.append({(cas_dose_begin, cas_dose_end): "central-dose"}) for _ in
+                     range(num_procedures)]
                 # TODO - if we end up supporting Python >= 3.10 in the future turn this into a case statement
                 for attr_type, inds_list in mention_attributes.items():
+                    print(f"AT DOSE {(cas_dose_begin, cas_dose_end)} have {attr_type} : {inds_list}", file=sys.stderr)
                     for idx, inds in enumerate(sorted(inds_list)):
                         # redundant but jic
                         central_dose = add_type(cas, dose_type, cas_dose_begin, cas_dose_end)
                         procedures[idx].dose = central_dose
-                        debug_procedures[idx][(cas_dose_begin, cas_dose_end)] = "central-dose"
                         local_begin, local_end = inds
                         cas_sig_begin, _ = token_map[local_begin]
                         _, cas_sig_end = token_map[local_end]
                         if attr_type == "boost":
                             procedure_boost = add_type(cas, boost_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].statusChange = procedure_boost
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "boost"
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "boost"
                         elif attr_type == "dose":
                             procedure_total_dose = add_type(cas, total_dose_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].totalDose = procedure_total_dose
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "secondary-dose"
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "secondary-dose"
                         elif attr_type == "fxno":
                             procedure_dosage_count = add_type(cas, fxno_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].dosageCount = procedure_dosage_count
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxno"
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxno"
                         elif attr_type == "fxfreq":
                             procedure_frequency = add_type(cas, fxfreq_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].frequency = procedure_frequency
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxfreq"
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxfreq"
                         elif attr_type == "site":
                             procedure_anatomical_site = add_type(cas, site_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].anatomicalSite = procedure_anatomical_site
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "site"
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "site"
                         elif attr_type == "date":
                             procedure_start_time = add_type(cas, date_type, cas_sig_begin, cas_sig_end)
                             procedures[idx].startTime = procedure_start_time
-                            debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "date"
-                        sent_to_procedures.append(debug_procedures)
-            print(f"{current} OUT OF {total_paragraphs} PROCESSED", file=sys.stderr)
+                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "date"
+                    sent_debug_procedures.extend(local_debug_procedures)
+            print(f"{current} OUT OF {total_paragraphs} TOTAL PARAGRAPHS PROCESSED", file=sys.stderr)
             current += 1
-        debug_printing(sent_to_procedures, paragraphs)
+            sent_to_debug_procedures.append(sent_debug_procedures)
+        debug_printing(sent_to_debug_procedures, [s.get_covered_text() for s in raw_sents])
         print("FINISHED", file=sys.stderr)

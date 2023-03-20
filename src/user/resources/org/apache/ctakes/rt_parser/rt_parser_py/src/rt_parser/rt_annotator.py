@@ -1,4 +1,5 @@
 import sys
+import re
 
 from ctakes_pbj.component.cas_annotator import *
 from ctakes_pbj.pbj_tools.create_type import *
@@ -19,17 +20,17 @@ from transformers import AutoConfig, AutoModel
 from collections import defaultdict
 
 
-def ctakes_tokenize(cas, sentence):
+def _ctakes_tokenize(cas, sentence):
     return sorted(cas.select_covered(BaseToken, sentence), key=lambda t: t.begin)
 
 
-def ctakes_clean(cas, sentence):
+def _ctakes_clean(cas, sentence):
     base_tokens = []
     token_map = []
     newline_tokens = cas.select_covered(NewlineToken, sentence)
     newline_token_indices = {(item.begin, item.end) for item in newline_tokens}
 
-    for base_token in ctakes_tokenize(cas, sentence):
+    for base_token in _ctakes_tokenize(cas, sentence):
         if (
                 (base_token.begin, base_token.end) not in newline_token_indices
                 # and base_token.get_covered_text()
@@ -44,7 +45,7 @@ def ctakes_clean(cas, sentence):
     return " ".join(base_tokens), token_map
 
 
-def get_casoid_entities(casoid):
+def _get_casoid_entities(casoid):
     """
 
     Args:
@@ -73,31 +74,189 @@ def get_casoid_entities(casoid):
     return axis_spans, sig_spans
 
 
-def get_tagged_sentence(procedure_map, sentence):
-    ann_sents = []
+def _get_tagged_sentence(procedure_map, sentence):
+    sentence_text = re.sub(r"(\r|\n)", " ", sentence.get_covered_text())
+    sentence_begin = sentence.begin
+    ann_sentences = []
     for sent_procs in procedure_map:
         previous = 0
         tagged_sent_pieces = []
-        for inds, tag in sorted(sent_procs.items()):
-            begin, end = inds
-            tagged_sent_pieces.append(sentence[previous:begin])
+        for indices, tag in sorted(sent_procs.items()):
+            raw_begin, raw_end = indices
+            begin = raw_begin - sentence_begin
+            end = raw_end - sentence_begin
+            tagged_sent_pieces.append(sentence_text[previous:begin])
             tagged_sent_pieces.append(f" <{tag}> ")
-            tagged_sent_pieces.append(sentence[begin:end])
+            tagged_sent_pieces.append(sentence_text[begin:end])
             tagged_sent_pieces.append(f" </{tag}> ")
             previous = end
-        ann_sents.append("".join(tagged_sent_pieces))
-    return ann_sents
+        tagged_sent_pieces.append(sentence_text[previous:])
+        ann_sentences.append("".join(tagged_sent_pieces) + " : " + str(sorted(sent_procs.items())))
+    return ann_sentences
 
 
-def debug_printing(sent_to_procedures, sentences):
+def _debug_printing(sent_to_procedures, sentences):
     with open("python_debug_out.txt", "wt") as debug_out:
         for idx, bundle in enumerate(zip(sentences, sent_to_procedures)):
             sentence, procedure_map = bundle
             debug_out.write(f"{idx}")
-            for out_str in get_tagged_sentence(procedure_map, sentence):
+            for out_str in _get_tagged_sentence(procedure_map, sentence):
                 debug_out.write(f"{out_str}\n\n")
 
 
+def _build_mention_dict(relations, dose_set):
+    mention_materials = defaultdict(lambda: defaultdict(lambda: []))
+    # Procedures are done only in terms of positive relations
+    for relation in filter(lambda s: s[2]["label"] != "None", relations):
+        (
+            first_span,
+            second_span,
+            label_dict,
+        ) = relation
+        relation_label = label_dict["label"]
+        sig_label = relation_label.split("-")[-1].lower()
+        if relation_label == "DOSE-DOSE":
+            mention_materials[first_span]["dose"].append(second_span)
+            mention_materials[second_span]["dose"].append(first_span)
+        elif first_span in dose_set:
+            mention_materials[first_span][sig_label].append(second_span)
+        elif second_span in dose_set:
+            mention_materials[second_span][sig_label].append(first_span)
+        else:
+            AttributeError(f"Neither {first_span} nor {second_span} in:\n\n {dose_set}")
+    return mention_materials
+
+
+def _insert_mentions(cas, token_map, types, mention_materials):
+    (
+        dose_type,
+        fxno_type,
+        total_dose_type,
+        fxfreq_type,
+        boost_type,
+        site_type,
+        date_type,
+        procedure_type
+    ) = types
+
+    sent_debug_procedures = []
+
+    for dose_indices, mention_attributes in sorted(mention_materials.items()):
+        num_procedures = len(max(mention_attributes.values(), key=len))
+        dose_begin, dose_end = dose_indices
+        cas_dose_begin, _ = token_map[dose_begin]
+        _, cas_dose_end = token_map[dose_end]
+        procedures = [add_type(cas, procedure_type, cas_dose_begin, cas_dose_end) for _ in
+                      range(num_procedures)]
+        local_debug_procedures = []
+        # avoiding a weird consequence of just doing
+        # local_debug_procedures = [{}] * num_procedures
+        # where if it was followed by local_debug_procedures[0]["dose"] = (0,1)
+        # we would get [{ "dose" : ( 0, 1 ) } ... { "dose" : ( 0, 1 ) }]
+        for _ in range(num_procedures):
+            local_debug_procedures.append({(cas_dose_begin, cas_dose_end): "central-dose"})
+
+        # TODO - if we end up supporting Python >= 3.10 in the future turn this into a case statement
+        for attr_type, indices_list in mention_attributes.items():
+            for idx, indices in enumerate(sorted(indices_list)):
+                # redundant but jic
+                central_dose = add_type(cas, dose_type, cas_dose_begin, cas_dose_end)
+                procedures[idx].dose = central_dose
+                local_begin, local_end = indices
+                cas_attr_begin, _ = token_map[local_begin]
+                _, cas_attr_end = token_map[local_end]
+                if attr_type == "boost":
+                    procedure_boost = add_type(cas, boost_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].statusChange = procedure_boost
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "boost"
+                elif attr_type == "dose":
+                    procedure_total_dose = add_type(cas, total_dose_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].totalDose = procedure_total_dose
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "secondary-dose"
+                elif attr_type == "fxno":
+                    procedure_dosage_count = add_type(cas, fxno_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].dosageCount = procedure_dosage_count
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "fxno"
+                elif attr_type == "fxfreq":
+                    procedure_frequency = add_type(cas, fxfreq_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].frequency = procedure_frequency
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "fxfreq"
+                elif attr_type == "site":
+                    procedure_anatomical_site = add_type(cas, site_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].anatomicalSite = procedure_anatomical_site
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "site"
+                elif attr_type == "date":
+                    procedure_start_time = add_type(cas, date_type, cas_attr_begin, cas_attr_end)
+                    procedures[idx].startTime = procedure_start_time
+                    local_debug_procedures[idx][(cas_attr_begin, cas_attr_end)] = "date"
+        sent_debug_procedures.extend(local_debug_procedures)
+    return sent_debug_procedures
+
+
+def _rt_processing(cas, out_models, taggers, anchor_task):
+    raw_sents = sorted(cas.select(Sentence), key=lambda s: s.begin)
+
+    def cas_clean_sent(sentence):
+        return _ctakes_clean(cas, sentence)
+
+    cleaned_sents, sent_maps = map(list, zip(*map(cas_clean_sent, raw_sents)))
+
+    def classify_casoid(casoid_pair):
+        paragraph, casoid = casoid_pair
+        return paragraph, classify_casoid_annotations(casoid, out_models)
+
+    def get_casoid_label(casoid_pair):
+        paragraph, casoid = casoid_pair
+        return casoid_to_label_tuples(paragraph, casoid)
+
+    paragraphs = cleaned_sents
+
+    paragraphs_2_raw_casoids = generate_paragraph_casoids(
+        paragraphs, taggers, anchor_task
+    )
+
+    paragraphs_2_classified_casoids = [
+        *map(classify_casoid, paragraphs_2_raw_casoids)
+    ]
+
+    casoid_labels = [*map(get_casoid_label, paragraphs_2_classified_casoids)]
+
+    return sent_maps, casoid_labels, paragraphs_2_classified_casoids
+
+
+def _get_rt_types(cas):
+    dose_type = cas.typesystem.get_type(DoseModifier)
+    fxno_type = cas.typesystem.get_type(DosageCountModifier)
+    total_dose_type = cas.typesystem.get_type(TotalDosageModifier)
+    fxfreq_type = cas.typesystem.get_type(FrequencyModifier)
+    boost_type = cas.typesystem.get_type(StatusChangeModifier)
+    site_type = cas.typesystem.get_type(AnatomicalSiteMention)
+    date_type = cas.typesystem.get_type(TimeMention)
+    procedure_type = cas.typesystem.get_type(ProcedureMention)
+
+    return (
+        dose_type,
+        fxno_type,
+        total_dose_type,
+        fxfreq_type,
+        boost_type,
+        site_type,
+        date_type,
+        procedure_type
+    )
+
+
+def _get_paragraph_dose_sets(paragraphs_2_classified_casoids):
+    paragraph_ent_spans = [
+        _get_casoid_entities(casoid)
+        for _, casoid in paragraphs_2_classified_casoids
+    ]
+
+    # [(dose_0, attr_0), ... , (dose_n, attr_n)] -> [dose_0, ... , dose_n] , [attr_0 , ... ,attr_n]
+    dose_spans, _ = zip(*paragraph_ent_spans)
+    paragraph_dose_sets = [{(idx_1, idx_2) for idx_1, idx_2, dose_label in paragraph_doses}
+                           for paragraph_doses in dose_spans]
+    return paragraph_dose_sets
 
 
 class RTAnnotator(CasAnnotator):
@@ -122,54 +281,20 @@ class RTAnnotator(CasAnnotator):
         self.anchor_task = "rt_dose"
 
     def process(self, cas):
-        dose_type = cas.typesystem.get_type(DoseModifier)
-        fxno_type = cas.typesystem.get_type(DosageCountModifier)
-        total_dose_type = cas.typesystem.get_type(TotalDosageModifier)
-        fxfreq_type = cas.typesystem.get_type(FrequencyModifier)
-        boost_type = cas.typesystem.get_type(StatusChangeModifier)
-        site_type = cas.typesystem.get_type(AnatomicalSiteMention)
-        date_type = cas.typesystem.get_type(TimeMention)
+        ctakes_rt_types = _get_rt_types(cas)
 
-        procedure_type = cas.typesystem.get_type(ProcedureMention)
-
-        raw_sents = sorted(cas.select(Sentence), key=lambda s: s.begin)
-
-        def cas_clean_sent(sentence):
-            return ctakes_clean(cas, sentence)
-
-        cleaned_sents, sent_maps = map(list, zip(*map(cas_clean_sent, raw_sents)))
-
-        def classify_casoid(casoid_pair):
-            paragraph, casoid = casoid_pair
-            return paragraph, classify_casoid_annotations(casoid, self.out_models)
-
-        def get_casoid_label(casoid_pair):
-            paragraph, casoid = casoid_pair
-            return casoid_to_label_tuples(paragraph, casoid)
-
-        paragraphs = cleaned_sents
-
-        paragraphs_2_raw_casoids = generate_paragraph_casoids(
-            paragraphs, self.taggers, self.anchor_task
+        (
+            sent_maps,
+            casoid_labels,
+            paragraphs_2_classified_casoids
+        ) = _rt_processing(
+            cas,
+            self.out_models,
+            self.taggers,
+            self.anchor_task,
         )
 
-        paragraphs_2_classified_cassoids = [
-            *map(classify_casoid, paragraphs_2_raw_casoids)
-        ]
-
-        # Will use this to populate relations since this is all the relations after coordination
-        casoid_labels = [*map(get_casoid_label, paragraphs_2_classified_cassoids)]
-
-        # one (axis_spans, attr_spans) for each paragraph
-        paragraph_ent_spans = [
-            get_casoid_entities(casoid)
-            for _, casoid in paragraphs_2_classified_cassoids
-        ]
-
-        # [(axis_0, attr_0), ... , (axis_n, attr_n)] -> [axis_0, ... , axis_n] , [attr_0 , ... ,attr_n]
-        axis_spans, attr_spans = zip(*paragraph_ent_spans)
-        paragraph_dose_sets = [{(idx_1, idx_2) for idx_1, idx_2, dose_label in paragraph_axes}
-                               for paragraph_axes in axis_spans]
+        paragraph_dose_sets = _get_paragraph_dose_sets(paragraphs_2_classified_casoids)
 
         total_paragraphs = len(sent_maps)
         current = 1
@@ -177,77 +302,10 @@ class RTAnnotator(CasAnnotator):
         sent_to_debug_procedures = []
 
         for relations, token_map, paragraph_dose_set in zip(casoid_labels, sent_maps, paragraph_dose_sets):
-            mention_materials = defaultdict(lambda: defaultdict(lambda: []))
-            for relation in relations:
-                (
-                    first_span,
-                    second_span,
-                    label_dict,
-                ) = relation
-                relation_label = label_dict["label"]
-                if relation_label != "None":
-                    sig_label = relation_label.split("-")[-1].lower()
-                    if relation_label == "DOSE-DOSE":
-                        mention_materials[first_span]["dose"].append(second_span)
-                        mention_materials[second_span]["dose"].append(first_span)
-                    elif first_span in paragraph_dose_set:
-                        mention_materials[first_span][sig_label].append(second_span)
-                    elif second_span in paragraph_dose_set:
-                        mention_materials[second_span][sig_label].append(first_span)
-                    else:
-                        AttributeError(f"Neither {first_span} nor {second_span} in:\n\n {paragraph_dose_set}")
-            sent_debug_procedures = []
-            for dose_indices, mention_attributes in sorted(mention_materials.items()):
-                num_procedures = len(max(mention_attributes.values(), key=len))
-                dose_begin, dose_end = dose_indices
-                cas_dose_begin, _ = token_map[dose_begin]
-                _, cas_dose_end = token_map[dose_end]
-                procedures = [add_type(cas, procedure_type, cas_dose_begin, cas_dose_end) for _ in
-                              range(num_procedures)]
-                local_debug_procedures = []
-                # avoiding a weird consequence of just doing
-                # local_debug_procedures = [{}] * num_procedures
-                # where if it was followed by local_debug_procedures[0]["dose"] = (0,1)
-                # we would get [{ "dose" : ( 0, 1 ) } ... { "dose" : ( 0, 1 ) }]
-                _ = [local_debug_procedures.append({(cas_dose_begin, cas_dose_end): "central-dose"}) for _ in
-                     range(num_procedures)]
-                # TODO - if we end up supporting Python >= 3.10 in the future turn this into a case statement
-                for attr_type, inds_list in mention_attributes.items():
-                    print(f"AT DOSE {(cas_dose_begin, cas_dose_end)} have {attr_type} : {inds_list}", file=sys.stderr)
-                    for idx, inds in enumerate(sorted(inds_list)):
-                        # redundant but jic
-                        central_dose = add_type(cas, dose_type, cas_dose_begin, cas_dose_end)
-                        procedures[idx].dose = central_dose
-                        local_begin, local_end = inds
-                        cas_sig_begin, _ = token_map[local_begin]
-                        _, cas_sig_end = token_map[local_end]
-                        if attr_type == "boost":
-                            procedure_boost = add_type(cas, boost_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].statusChange = procedure_boost
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "boost"
-                        elif attr_type == "dose":
-                            procedure_total_dose = add_type(cas, total_dose_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].totalDose = procedure_total_dose
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "secondary-dose"
-                        elif attr_type == "fxno":
-                            procedure_dosage_count = add_type(cas, fxno_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].dosageCount = procedure_dosage_count
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxno"
-                        elif attr_type == "fxfreq":
-                            procedure_frequency = add_type(cas, fxfreq_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].frequency = procedure_frequency
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "fxfreq"
-                        elif attr_type == "site":
-                            procedure_anatomical_site = add_type(cas, site_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].anatomicalSite = procedure_anatomical_site
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "site"
-                        elif attr_type == "date":
-                            procedure_start_time = add_type(cas, date_type, cas_sig_begin, cas_sig_end)
-                            procedures[idx].startTime = procedure_start_time
-                            local_debug_procedures[idx][(cas_sig_begin, cas_sig_end)] = "date"
-                    sent_debug_procedures.extend(local_debug_procedures)
+            mention_materials = _build_mention_dict(relations, paragraph_dose_set)
+            sent_debug_procedures = _insert_mentions(cas, token_map, ctakes_rt_types, mention_materials)
             print(f"{current} OUT OF {total_paragraphs} TOTAL PARAGRAPHS PROCESSED", file=sys.stderr)
             current += 1
             sent_to_debug_procedures.append(sent_debug_procedures)
-        debug_printing(sent_to_debug_procedures, [s.get_covered_text() for s in raw_sents])
+        _debug_printing(sent_to_debug_procedures, sorted(cas.select(Sentence), key=lambda s: s.begin))
         print("FINISHED", file=sys.stderr)

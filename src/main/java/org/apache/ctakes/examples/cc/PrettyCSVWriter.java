@@ -1,4 +1,4 @@
-package org.apache.ctakes.core.cc.pretty.plaintext;
+package org.apache.ctakes.examples.cc;
 
 import org.apache.ctakes.core.util.doc.DocIdUtil;
 import org.apache.ctakes.typesystem.type.textsem.ProcedureMention;
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 /**
  * Note level RT annotations output for the RT Docker
- *
+ * Probably deprecate in favor of RTTableFileWriter
  * @author Eli , chip-nlp
  * @version %I%
  * @since 3/10/2023

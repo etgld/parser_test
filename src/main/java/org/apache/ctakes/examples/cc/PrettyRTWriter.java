@@ -1,4 +1,4 @@
-package org.apache.ctakes.core.cc.pretty.plaintext;
+package org.apache.ctakes.examples.cc;
 
 import org.apache.ctakes.core.util.Pair;
 import org.apache.ctakes.core.util.doc.DocIdUtil;
@@ -172,16 +172,16 @@ final public class PrettyRTWriter extends JCasAnnotator_ImplBase {
 
       writer.write(
               taggedSentence(
-              container
-                      .getCoveredText()
-                      .replace("\n", " "),
+              container,
+                      // .getCoveredText()
+                      // .replace("\n", " "),
               labelToInds
          )
       );
       writer.newLine();
    }
 
-   static private String taggedSentence(String sentenceText, Map<Pair<Integer>, String> labelToInds){
+   static private String taggedSentence(Sentence sentence, Map<Pair<Integer>, String> labelToInds){
       StringBuilder out = new StringBuilder();
       List<Pair<Integer>> orderedInds = labelToInds
               .keySet()
@@ -195,16 +195,20 @@ final public class PrettyRTWriter extends JCasAnnotator_ImplBase {
                       Collectors.toList()
               );
 
+      String sentenceText = sentence.getCoveredText().replace("\n", " ");
+      int sentenceBegin = sentence.getBegin();
       int previous = 0;
 
       for (Pair<Integer> indices : orderedInds){
          String tag = labelToInds.get(indices);
-         out.append(sentenceText, previous, indices.getValue1());
+         out.append(sentenceText, previous, indices.getValue1() - sentenceBegin);
          out.append(String.format("<%s>", tag));
-         out.append(sentenceText, indices.getValue1(), indices.getValue2());
+         out.append(sentenceText, indices.getValue1(), indices.getValue2() - sentenceBegin);
          out.append(String.format("</%s>", tag));
          previous = indices.getValue2();
       }
+
+      out.append(sentenceText, previous, sentenceText.length());
 
       return out.toString();
    }

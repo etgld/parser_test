@@ -17,8 +17,7 @@ reader PbjReceiver ReceiveQueue=PyToJava
 // add pretty.plaintext.PrettyTextWriterFit SubDirectory=text
 
 // Save CSV tables
-// add org.apache.ctakes.rt_parser.cc.pretty.csv.PrettyCSVWriter SubDirectory=csv
-add PrettyCSVWriter SubDirectory=csv
+add RTTableFileWriter SubDirectory=csv
 
 // Save text rendering of procedure annotations
 // add org.apache.ctakes.rt_parser.cc.pretty.text.PrettyRTWriter SubDirectory=text

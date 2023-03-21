@@ -273,8 +273,8 @@ class RTAnnotator(CasAnnotator):
         # TODO - replace this with a logger message or something
         # TODO - point this to the write place
         taggers_dict, out_model_dict = model_dicts(
-            # "/home/ch231037/rt_models/"
-            "/home/etg/RT_Resources/trained_train+dev_tested_on_test/test_pipeline_models"
+            "/home/ch231037/rt_models/"
+            # "/home/etg/RT_Resources/trained_train+dev_tested_on_test/test_pipeline_models"
         )
         self.taggers = taggers_dict
         self.out_models = out_model_dict
@@ -296,16 +296,17 @@ class RTAnnotator(CasAnnotator):
 
         paragraph_dose_sets = _get_paragraph_dose_sets(paragraphs_2_classified_casoids)
 
-        total_paragraphs = len(sent_maps)
-        current = 1
+        # total_paragraphs = len(sent_maps)
+        # current = 1
 
-        sent_to_debug_procedures = []
+        # sent_to_debug_procedures = []
 
         for relations, token_map, paragraph_dose_set in zip(casoid_labels, sent_maps, paragraph_dose_sets):
             mention_materials = _build_mention_dict(relations, paragraph_dose_set)
-            sent_debug_procedures = _insert_mentions(cas, token_map, ctakes_rt_types, mention_materials)
-            print(f"{current} OUT OF {total_paragraphs} TOTAL PARAGRAPHS PROCESSED", file=sys.stderr)
-            current += 1
-            sent_to_debug_procedures.append(sent_debug_procedures)
-        _debug_printing(sent_to_debug_procedures, sorted(cas.select(Sentence), key=lambda s: s.begin))
+            # sent_debug_procedures = _insert_mentions(cas, token_map, ctakes_rt_types, mention_materials)
+            _ = _insert_mentions(cas, token_map, ctakes_rt_types, mention_materials)
+            # print(f"{current} OUT OF {total_paragraphs} TOTAL PARAGRAPHS PROCESSED", file=sys.stderr)
+            # current += 1
+            # sent_to_debug_procedures.append(sent_debug_procedures)
+        # _debug_printing(sent_to_debug_procedures, sorted(cas.select(Sentence), key=lambda s: s.begin))
         print("FINISHED", file=sys.stderr)

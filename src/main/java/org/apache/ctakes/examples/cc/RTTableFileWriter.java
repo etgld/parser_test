@@ -58,8 +58,10 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
         // Using dumb filter on text "dose" until we set the CUI.
         return JCasUtil.select( jCas, ProcedureMention.class )
                 .stream()
-                .filter( p -> p.getCoveredText().toLowerCase().contains( "dose" ) )
-//            .filter( p -> IdentifiedAnnotationUtil.getCuis( p ).contains( RT_CUI ) )
+                // every procedure mention definitionally has a dose attribute,
+                // and there are a number of cases of RT mentions I've seen where the word 'dose' is not mentioned
+                // .filter( p -> p.getCoveredText().toLowerCase().contains( "dose" ) )
+                // .filter( p -> IdentifiedAnnotationUtil.getCuis( p ).contains( RT_CUI ) )
                 .sorted( Comparator.comparingInt( Annotation::getBegin ) )
                 .map( RTTableFileWriter.ModifierRow::new )
                 .map( RTTableFileWriter.ModifierRow::getColumns )

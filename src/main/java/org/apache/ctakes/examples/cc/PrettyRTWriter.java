@@ -120,9 +120,9 @@ final public class PrettyRTWriter extends JCasAnnotator_ImplBase {
            final BufferedWriter writer
    ) throws IOException {
 
-      // there HAS to be a better way
+      // there HAS to be a better way to do this
       // (would be trivial if cTAKES returned a null instead of throwing a fit)
-      // to do this but for now:
+      // but for now:
 
 
       writer.write(String.format("\n%d.\t", _current_procedure));
@@ -173,8 +173,6 @@ final public class PrettyRTWriter extends JCasAnnotator_ImplBase {
       writer.write(
               taggedSentence(
               container,
-                      // .getCoveredText()
-                      // .replace("\n", " "),
               labelToInds
          )
       );
@@ -201,11 +199,13 @@ final public class PrettyRTWriter extends JCasAnnotator_ImplBase {
 
       for (Pair<Integer> indices : orderedInds){
          String tag = labelToInds.get(indices);
-         out.append(sentenceText, previous, indices.getValue1() - sentenceBegin);
+         int localBegin = indices.getValue1() - sentenceBegin;
+         int localEnd = indices.getValue2() - sentenceBegin;
+         out.append(sentenceText, previous, localBegin);
          out.append(String.format("<%s>", tag));
-         out.append(sentenceText, indices.getValue1(), indices.getValue2() - sentenceBegin);
+         out.append(sentenceText, localBegin, localEnd);
          out.append(String.format("</%s>", tag));
-         previous = indices.getValue2();
+         previous = localEnd;
       }
 
       out.append(sentenceText, previous, sentenceText.length());

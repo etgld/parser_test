@@ -7,22 +7,12 @@ package org.apache.core.cc.pretty.plaintext
 // Get cas from Artemis.
 reader PbjReceiver ReceiveQueue=PyToJava
 
-// Save a nice table.
-// add SemanticTableFileWriter SubDirectory=table
-
-// Save HTML.
-// add pretty.html.HtmlTextWriter SubDirectory=html
-
-// Save marked text.
-// add pretty.plaintext.PrettyTextWriterFit SubDirectory=text
-
 // Save CSV tables
-add RTTableFileWriter SubDirectory=csv
+// add RTTableFileWriter tableType=CSV
 
-// Save text rendering of procedure annotations
-// add org.apache.ctakes.rt_parser.cc.pretty.text.PrettyRTWriter SubDirectory=text
-add PrettyRTWriter SubDirectory=text
+add PrettyCSVWriter outputDirectoryPath=own_CSV
 
+add PrettyRTWriter outputDirectoryPath=own_TXT
 
 // Perform steps to stop the pbj pipeline
 load PbjStopper

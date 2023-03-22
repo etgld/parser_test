@@ -31,7 +31,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
     // C5688326 is the umls cui for "Radiotherapy Treatment Phase".
     static private final String RT_CUI = "C5688326";
     static private final String NO_ANNOTATION = "None";
-    static private final AtomicInteger COUNTER = new AtomicInteger( 0 );
+    // static private final AtomicInteger COUNTER = new AtomicInteger( 0 );
 
     /**
      * {@inheritDoc}
@@ -39,7 +39,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
     @Override
     protected List<String> createHeaderRow( final JCas jCas ) {
         return Arrays.asList(
-                " procedure_number ",
+                //" procedure_number ",
                 " central_dose ",
                 " boost ",
                 " date ",
@@ -54,7 +54,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
      */
     @Override
     protected List<List<String>> createDataRows( final JCas jCas ) {
-        COUNTER.set( 0 );
+        // COUNTER.set( 0 );
         // Using dumb filter on text "dose" until we set the CUI.
         return JCasUtil.select( jCas, ProcedureMention.class )
                 .stream()
@@ -73,7 +73,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
      * Simple container for annotation information.
      */
     static private class ModifierRow {
-        private final String _procedureNumber;
+        // private final String _procedureNumber;
         private final String _centralDose;
         private final String _boost;
         private final String _date;
@@ -83,7 +83,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
         private final String _site;
 
         private ModifierRow( final ProcedureMention rt ) {
-            _procedureNumber = COUNTER.incrementAndGet() + "";
+            // _procedureNumber = COUNTER.incrementAndGet() + "";
             _centralDose = getOffsets( rt );
             _boost = getOffsets( rt.getStatusChange() );
             _date = getOffsets( rt.getStartTime() );
@@ -95,7 +95,7 @@ public class RTTableFileWriter extends AbstractTableFileWriter {
 
         public List<String> getColumns() {
             return Arrays.asList(
-                    _procedureNumber,
+                    //_procedureNumber,
                     _centralDose,
                     _boost,
                     _date,

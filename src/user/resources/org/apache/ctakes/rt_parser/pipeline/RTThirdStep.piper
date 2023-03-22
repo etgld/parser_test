@@ -8,11 +8,10 @@ package org.apache.core.cc.pretty.plaintext
 reader PbjReceiver ReceiveQueue=PyToJava
 
 // Save CSV tables
-// add RTTableFileWriter tableType=CSV
+add RTTableFileWriter SubDirectory=csv TableType=CSV
 
-add PrettyCSVWriter outputDirectoryPath=own_CSV
-
-add PrettyRTWriter outputDirectoryPath=own_TXT
+// Save CSV tables
+add RTProcedureTextWriter
 
 // Perform steps to stop the pbj pipeline
 load PbjStopper

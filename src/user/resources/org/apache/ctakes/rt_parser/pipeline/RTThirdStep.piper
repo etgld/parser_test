@@ -11,7 +11,7 @@ reader PbjReceiver ReceiveQueue=PyToJava
 add RTTableFileWriter SubDirectory=csv TableType=CSV
 
 // Save CSV tables
-add RTProcedureTextWriter
+add RTProcedureTextWriter SubDirectory=txt
 
 // Perform steps to stop the pbj pipeline
 load PbjStopper

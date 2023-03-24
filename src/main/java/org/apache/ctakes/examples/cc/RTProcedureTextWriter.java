@@ -26,7 +26,6 @@ final public class RTProcedureTextWriter extends AbstractJCasFileWriter {
 
     static private final Logger LOGGER = Logger.getLogger( "RTProcedureTextWriter" );
     static private final String FILE_EXTENSION = ".txt";
-    static private int _current_procedure = 0;
 
 
     @Override
@@ -34,30 +33,52 @@ final public class RTProcedureTextWriter extends AbstractJCasFileWriter {
                            final String outputDir,
                            final String documentId,
                            final String fileName ) throws IOException {
-        final File outputFilePath = new File( outputDir , fileName + FILE_EXTENSION );
+        final File outputFilePath = new File( outputDir , fileName + "_procedure_tags" + FILE_EXTENSION );
         LOGGER.info("Writing " + fileName + FILE_EXTENSION + " to " + outputFilePath.getPath()  +" ...") ;
         try ( Writer writer = new BufferedWriter( new FileWriter( outputFilePath ) ) ) {
-            Map<Annotation, Collection<Sentence>> sentIndex = JCasUtil.indexCovering(jCas, Annotation.class, Sentence.class);
-            final List<ProcedureMention> procedureMentions = JCasUtil
-                    .select( jCas, ProcedureMention.class )
+            Map<Sentence, Collection<ProcedureMention>> sent2ColProcs = JCasUtil.indexCovered(jCas, Sentence.class, ProcedureMention.class);
+            Map<Sentence, List<ProcedureMention>> sent2Procs = new HashMap<>();
+            sent2ColProcs
+                    .keySet()
+                    .forEach(
+                    sentence -> sent2Procs.put(
+                            sentence,
+                            sent2ColProcs
+                                    .get(sentence)
+                                    .stream()
+                                    .sorted(
+                                            Comparator.comparingInt( ProcedureMention::getBegin )
+                                    ).collect(Collectors.toList())
+                    )
+            );
+            List<Sentence> casSentences = JCasUtil.select(jCas, Sentence.class)
                     .stream()
                     .sorted(
                             Comparator.comparingInt(
-                                    ProcedureMention :: getBegin
+                                    Sentence :: getBegin
                             )
-                    )
-                    .collect(Collectors.toList());
-            for ( ProcedureMention procedureMention : procedureMentions ) {
-                Sentence container = sentIndex.get(procedureMention).iterator().next();
-                writeMention( container, procedureMention, writer );
-            }
+                    ).collect(Collectors.toList());
+
+            casSentences.forEach(
+                    sentence -> sent2Procs
+                            .get(sentence)
+                            .forEach(
+                                    mention -> {
+                                        try {
+                                            writeMention(
+                                                    casSentences.indexOf(sentence) + 1,
+                                                    sent2Procs.get(sentence).indexOf(mention) + 1,
+                                                    sentence,
+                                                    mention,
+                                                    writer
+                                            );
+                                        } catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    }
+                            )
+            );
         }
-        /*
-        catch ( IOException ioE ) {
-            LOGGER.error( "Could not not write csv file " + outputFilePath );
-            LOGGER.error( ioE.getMessage() );
-        }
-         */
         LOGGER.info( "Finished Writing" );
     }
 
@@ -76,6 +97,8 @@ final public class RTProcedureTextWriter extends AbstractJCasFileWriter {
      * @throws IOException if the writer has issues
      */
     static public void writeMention(
+            final int sentIndex,
+            final int localProcIndex,
             final Sentence container,
             final ProcedureMention procedureMention,
             final Writer writer
@@ -86,8 +109,14 @@ final public class RTProcedureTextWriter extends AbstractJCasFileWriter {
         // but for now:
 
 
-        writer.write(String.format("\n%d.\t", _current_procedure));
-        _current_procedure++;
+        writer.write(
+                String.format(
+                        "\nParagraph: %d , ProcedureMention: %d\n\n",
+                        sentIndex,
+                        localProcIndex
+                )
+        );
+
 
         Map<Pair<Integer>, String> labelToInds = new HashMap<>();
         // central dose

@@ -1,8 +1,0 @@
-torch
-torchvision
-torchaudio
-tomli>=2.0
-transitions
-python_version<3.11
-ctakes-pbj~=5.0.0
-cnlp_transformers@ git+https://github.com/Machine-Learning-for-Medical-Language/radiotherapy_end2end.git

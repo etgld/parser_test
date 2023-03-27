@@ -19,6 +19,12 @@
          <artifactId>ctakes-pbj</artifactId>
          <version>${ctakes.version}</version>
       </dependency>
+        <dependency>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.4.2</version>
+        <type>maven-plugin</type>
+    </dependency>
       <dependency>
          <groupId>org.apache.ctakes</groupId>
          <artifactId>ctakes-user-resources</artifactId>
@@ -68,7 +74,7 @@
                      </resources>
                      <outputDirectory>${project.basedir}/resources</outputDirectory>
                   </configuration>
-               </execution>
+	            </execution>
             </executions>
          </plugin>
 
@@ -86,11 +92,34 @@
                   <configuration>
                      <includeGroupIds>org.apache.ctakes</includeGroupIds>
                      <includeArtifactIds>ctakes-user-resources</includeArtifactIds>
-                     <outputDirectory>${project.basedir}/resources</outputDirectory>
+		     <outputDirectory>${project.basedir}/resources</outputDirectory>
                   </configuration>
                </execution>
             </executions>
-         </plugin>
+    </plugin>
+          <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-assembly-plugin</artifactId>
+              <configuration>
+                  <descriptorRefs>
+                      <descriptorRef>jar-with-dependencies</descriptorRef>
+                  </descriptorRefs>
+                  <archive>
+                      <manifest>
+                          <mainClass>org.apache.ctakes.core.pipeline.PiperFileRunner</mainClass>
+                      </manifest>
+                  </archive>
+              </configuration>
+              <executions>
+                  <execution>
+                      <id>make-assembly</id>
+                      <phase>package</phase>
+                      <goals>
+                          <goal>single</goal>
+                      </goals>
+                  </execution>
+              </executions>
+          </plugin>
       </plugins>
    </build>
 </project>

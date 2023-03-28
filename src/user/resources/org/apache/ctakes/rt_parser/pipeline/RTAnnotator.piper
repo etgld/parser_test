@@ -24,14 +24,14 @@ set SetJavaHome=no
 #  By default ctakes-pbj will be pip ed at the beginning of a run.  You can turn this off with:
 #  --pipPbj no
 #
-cli PipRT=pipRT
+cli PipRT=r
 
 
 
 //  Sets up required parameters, starts your Artemis Broker, pips the PBJ project.
 load PbjStarter
 // add PythonRunner Command="-m pip install resources/org/apache/ctakes/rt_parser/rt_parser_py" Wait=yes
-add RTPipper
+add org.apache.ctakes.rt_parser.ae.RTPipper
 //
 // Start another instance of cTAKES, running the pipeline in StartAllExample_end.piper
 // $OutputDirectory will substitute the value of this cTAKES pipeline's value for OutputDirectory.

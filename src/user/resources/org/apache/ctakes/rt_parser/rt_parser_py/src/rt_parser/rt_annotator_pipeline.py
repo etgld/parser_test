@@ -12,9 +12,7 @@ from ctakes_pbj.pipeline.pbj_pipeline import PBJPipeline
 
 warnings.filterwarnings("ignore")
 
-
 def main():
-
     pipeline = PBJPipeline()
     pipeline.add(RTAnnotator())
     pipeline.add(PBJSender())

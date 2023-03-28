@@ -273,8 +273,7 @@ class RTAnnotator(CasAnnotator):
         # TODO - replace this with a logger message or something
         # TODO - point this to the write place
         taggers_dict, out_model_dict = model_dicts(
-            # "/home/ch231037/rt_models/"
-            "/home/etg/RT_Resources/trained_train+dev_tested_on_test/test_pipeline_models"
+            "/home/ch231037/rt_models"
         )
         self.taggers = taggers_dict
         self.out_models = out_model_dict

@@ -59,9 +59,13 @@ final public class RTProcedureTextWriter extends AbstractJCasFileWriter {
                             )
                     ).collect(Collectors.toList());
 
-            casSentences.forEach(
-                    sentence -> sent2Procs
-                            .get(sentence)
+            casSentences
+                    .stream()
+                    .filter(
+                            sent2Procs::containsKey
+                    )
+                    .forEach(
+                    sentence -> sent2Procs.get(sentence)
                             .forEach(
                                     mention -> {
                                         try {
